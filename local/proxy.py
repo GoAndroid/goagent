@@ -1355,7 +1355,8 @@ class Common(object):
         self.HOSTS_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items(hosts_secname) if '\\' not in k and ':' not in k and k.startswith('.'))
         self.HOSTS_POSTFIX_ENDSWITH = tuple(self.HOSTS_POSTFIX_MAP)
 
-        self.CONNECT_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items(hosts_secname) if ':' in k)
+        self.CONNECT_HOSTS_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items(hosts_secname) if ':' in k and not k.startswith('.'))
+        self.CONNECT_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items(hosts_secname) if ':' in k and k.startswith('.'))
         self.CONNECT_POSTFIX_ENDSWITH = tuple(self.CONNECT_POSTFIX_MAP)
 
         self.METHOD_REMATCH_MAP = collections.OrderedDict((re.compile(k).match, v) for k, v in self.CONFIG.items(hosts_secname) if '\\' in k)
@@ -1868,8 +1869,11 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             logging.info('resolve common.IPLIST_MAP names=%s to iplist', list(common.IPLIST_MAP))
             common.resolve_iplist()
             for appid in common.GAE_APPIDS:
-                common.HOSTS_MAP['%s.appspot.com' % appid] = common.HOSTS_POSTFIX_MAP['.appspot.com']
-                http_util.dns['%s.appspot.com' % appid] = common.IPLIST_MAP[common.HOSTS_POSTFIX_MAP['.appspot.com']]
+                host = '%s.appspot.com' % appid
+                if host not in common.HOSTS_MAP:
+                    common.HOSTS_MAP[host] = common.HOSTS_POSTFIX_MAP['.appspot.com']
+                if host not in http_util.dns:
+                    http_util.dns[host] = common.IPLIST_MAP[common.HOSTS_MAP[host]]
 
     def setup(self):
         if isinstance(self.__class__.first_run, collections.Callable):
@@ -1911,7 +1915,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.parsed_url = urlparse.urlparse(self.path)
         if common.USERAGENT_ENABLE:
             self.headers['User-Agent'] = common.USERAGENT_STRING
-        if host not in common.HTTP_WITHGAE:
+        if host in common.HTTP_WITHGAE:
             return self.do_METHOD_GAE()
         if host in common.HTTP_FORCEHTTPS:
             return self.wfile.write(('HTTP/1.1 301\r\nLocation: %s\r\n\r\n' % self.path.replace('http://', 'https://', 1)).encode())
@@ -1936,6 +1940,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 hostname = next(common.HOSTS_POSTFIX_MAP[x] for x in common.HOSTS_POSTFIX_MAP if host.endswith(x))
             else:
                 hostname = host
+            hostname = hostname or host
             if hostname in common.IPLIST_MAP:
                 http_util.dns[host] = common.IPLIST_MAP[hostname]
             else:
@@ -2110,10 +2115,10 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_CONNECT(self):
         """handle CONNECT cmmand, socket forward or deploy a fake cert"""
         host, _, port = self.path.rpartition(':')
-        if self.path.endswith(common.CONNECT_POSTFIX_ENDSWITH):
-            return self.do_CONNECT_FWD()
-        elif host in common.HTTP_FAKEHTTPS or host in common.HTTP_WITHGAE:
+        if host in common.HTTP_FAKEHTTPS or host in common.HTTP_WITHGAE:
             return self.do_CONNECT_AGENT()
+        elif self.path in common.CONNECT_HOSTS_MAP or self.path.endswith(common.CONNECT_POSTFIX_ENDSWITH):
+            return self.do_CONNECT_FWD()
         elif host in common.HOSTS_MAP or host.endswith(common.HOSTS_POSTFIX_ENDSWITH):
             return self.do_CONNECT_FWD()
         else:
@@ -2130,7 +2135,9 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             data = self.connection.recv(1024)
             for i in range(5):
                 try:
-                    if self.path.endswith(common.CONNECT_POSTFIX_ENDSWITH):
+                    if self.path in common.CONNECT_HOSTS_MAP:
+                        hostname = common.CONNECT_HOSTS_MAP[host]
+                    elif self.path.endswith(common.CONNECT_POSTFIX_ENDSWITH):
                         hostname = next(common.CONNECT_POSTFIX_MAP[x] for x in common.CONNECT_POSTFIX_MAP if self.path.endswith(x))
                     elif host in common.HOSTS_MAP:
                         hostname = common.HOSTS_MAP[host]
@@ -2138,6 +2145,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                         hostname = next(common.HOSTS_POSTFIX_MAP[x] for x in common.HOSTS_POSTFIX_MAP if host.endswith(x))
                     else:
                         hostname = host
+                    hostname = hostname or host
                     if hostname in common.IPLIST_MAP:
                         http_util.dns[host] = common.IPLIST_MAP[hostname]
                     else:
