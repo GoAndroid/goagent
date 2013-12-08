@@ -1349,18 +1349,18 @@ class Common(object):
         self.GAE_OPTIONS = self.CONFIG.get('gae', 'options')
         self.GAE_FETCHSERVER = '%s://%s.appspot.com%s?' % (self.GAE_MODE, self.GAE_APPIDS[0], self.GAE_PATH)
 
-        self.HOSTS_MAP = collections.OrderedDict((k, v or k) for k, v in self.CONFIG.items('hosts') if ':' not in k and not k.startswith('.'))
-        self.HOSTS_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items('hosts') if ':' not in k and k.startswith('.'))
+        self.HOSTS_MAP = collections.OrderedDict((k, v or k) for k, v in self.CONFIG.items('hosts') if '\\' not in k and ':' not in k and not k.startswith('.'))
+        self.HOSTS_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items('hosts') if '\\' not in k and ':' not in k and k.startswith('.'))
         self.HOSTS_POSTFIX_ENDSWITH = tuple(self.HOSTS_POSTFIX_MAP)
 
-        self.HTTPS_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items('hosts') if ':' in k)
-        self.HTTPS_POSTFIX_ENDSWITH = tuple(self.HTTPS_POSTFIX_MAP)
+        self.CONNECT_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items('hosts') if ':' in k)
+        self.CONNECT_POSTFIX_ENDSWITH = tuple(self.CONNECT_POSTFIX_MAP)
 
-        self.HTTP_REMATCH_MAP = collections.OrderedDict((re.compile(k).match, v) for k, v in self.CONFIG.items('http'))
+        self.METHOD_REMATCH_MAP = collections.OrderedDict((re.compile(k).match, v) for k, v in self.CONFIG.items('hosts') if '\\' in k)
 
-        self.EXHTTP_FORCEHTTPS = set(self.CONFIG.get('exhttp', 'forcehttps').split('|'))
-        self.EXHTTP_FAKEHTTPS = set(self.CONFIG.get('exhttp', 'fakehttps').split('|'))
-        self.EXHTTP_WITHGAE = set(self.CONFIG.get('exhttp', 'withgae').split('|'))
+        self.HTTP_FORCEHTTPS = set(self.CONFIG.get('http', 'forcehttps').split('|'))
+        self.HTTP_FAKEHTTPS = set(self.CONFIG.get('http', 'fakehttps').split('|'))
+        self.HTTP_WITHGAE = set(self.CONFIG.get('http', 'withgae').split('|'))
 
         self.IPLIST_MAP = collections.OrderedDict((k, v.split('|')) for k, v in self.CONFIG.items('iplist'))
         self.IPLIST_MAP.update((k, [k]) for k, v in self.HOSTS_MAP.items() if k == v)
@@ -1909,13 +1909,13 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.parsed_url = urlparse.urlparse(self.path)
         if common.USERAGENT_ENABLE:
             self.headers['User-Agent'] = common.USERAGENT_STRING
-        if host not in common.EXHTTP_WITHGAE:
+        if host not in common.HTTP_WITHGAE:
             return self.do_METHOD_GAE()
-        if host in common.EXHTTP_FORCEHTTPS:
+        if host in common.HTTP_FORCEHTTPS:
             return self.wfile.write(('HTTP/1.1 301\r\nLocation: %s\r\n\r\n' % self.path.replace('http://', 'https://', 1)).encode())
         if self.command not in ('GET', 'POST', 'HEAD', 'PUT', 'DELETE', 'PATCH'):
             return self.do_METHOD_FWD()
-        if any(x(self.path) for x in common.HTTP_REMATCH_MAP):
+        if any(x(self.path) for x in common.METHOD_REMATCH_MAP):
             return self.do_METHOD_FWD()
         else:
             return self.do_METHOD_GAE()
@@ -1926,8 +1926,8 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             content_length = int(self.headers.get('Content-Length', 0))
             payload = self.rfile.read(content_length) if content_length else b''
             host = self.parsed_url.netloc
-            if any(x(self.path) for x in common.HTTP_REMATCH_MAP):
-                hostname = next(common.HTTP_REMATCH_MAP[x] for x in common.HTTP_REMATCH_MAP if x(self.path))
+            if any(x(self.path) for x in common.METHOD_REMATCH_MAP):
+                hostname = next(common.METHOD_REMATCH_MAP[x] for x in common.METHOD_REMATCH_MAP if x(self.path))
             elif host in common.HOSTS_MAP:
                 hostname = common.HOSTS_MAP[host]
             elif host.endswith(common.HOSTS_POSTFIX_ENDSWITH):
@@ -1954,7 +1954,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         except NetWorkIOError as e:
             if e.args[0] in (errno.ECONNRESET, 10063, errno.ENAMETOOLONG):
                 logging.warn('http_util.request "%s %s" failed:%s, try addto `withgae`', self.command, self.path, e)
-                common.EXHTTP_WITHGAE = tuple(list(common.EXHTTP_WITHGAE)+[re.sub(r':\d+$', '', self.parsed_url.netloc)])
+                common.HTTP_WITHGAE = tuple(list(common.HTTP_WITHGAE)+[re.sub(r':\d+$', '', self.parsed_url.netloc)])
             elif e.args[0] not in (errno.ECONNABORTED, errno.EPIPE):
                 raise
         except Exception as e:
@@ -2108,9 +2108,9 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_CONNECT(self):
         """handle CONNECT cmmand, socket forward or deploy a fake cert"""
         host, _, port = self.path.rpartition(':')
-        if self.path.endswith(common.HTTPS_POSTFIX_ENDSWITH):
+        if self.path.endswith(common.CONNECT_POSTFIX_ENDSWITH):
             return self.do_CONNECT_FWD()
-        elif host in common.EXHTTP_FAKEHTTPS or host in common.EXHTTP_WITHGAE:
+        elif host in common.HTTP_FAKEHTTPS or host in common.HTTP_WITHGAE:
             return self.do_CONNECT_AGENT()
         elif host in common.HOSTS_MAP or host.endswith(common.HOSTS_POSTFIX_ENDSWITH):
             return self.do_CONNECT_FWD()
@@ -2128,8 +2128,8 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             data = self.connection.recv(1024)
             for i in range(5):
                 try:
-                    if self.path.endswith(common.HTTPS_POSTFIX_ENDSWITH):
-                        hostname = next(common.HTTPS_POSTFIX_MAP[x] for x in common.HTTPS_POSTFIX_MAP if self.path.endswith(x))
+                    if self.path.endswith(common.CONNECT_POSTFIX_ENDSWITH):
+                        hostname = next(common.CONNECT_POSTFIX_MAP[x] for x in common.CONNECT_POSTFIX_MAP if self.path.endswith(x))
                     elif host in common.HOSTS_MAP:
                         hostname = common.HOSTS_MAP[host]
                     elif host.endswith(common.HOSTS_POSTFIX_ENDSWITH):
