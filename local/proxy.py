@@ -1847,11 +1847,11 @@ class LocalProxyServer(SocketServer.ThreadingTCPServer):
 
     def handle_error(self, *args):
         """make ThreadingTCPServer happy"""
-        etype, value, tb = sys.exc_info()
+        etype, value = sys.exc_info()[:2]
         if isinstance(value, NetWorkIOError) and 'bad write retry' in value.args[1]:
-            etype = value = tb = None
+            etype = value = None
         else:
-            del etype, value, tb
+            del etype, value
             SocketServer.ThreadingTCPServer.handle_error(self, *args)
 
 
