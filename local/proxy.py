@@ -623,13 +623,21 @@ class PacUtil(object):
                 use_proxy = False
             if '||' == line[:2]:
                 line = line[2:]
-                use_domain = True
+                if '/' not in line:
+                    use_domain = True
+                else:
+                    if not line.startswith('http://'):
+                        line = 'http://' + line
+                    use_start = True
             elif '|' == line[0]:
                 line = line[1:]
+                if not line.startswith('http://'):
+                    line = 'http://' + line
                 use_start = True
             if line[-1] in ('^', '|'):
                 line = line[:-1]
-                use_end = True
+                if not use_postfix:
+                    use_end = True
             return_proxy = 'PROXY %s' % proxy if use_proxy else default
             line = line.replace('^', '*').strip('*')
             if use_start and use_end:
