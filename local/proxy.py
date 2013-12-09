@@ -49,8 +49,8 @@ try:
     import gevent.queue
     import gevent.event
     import gevent.monkey
-    gevent.monkey.patch_all()
-except (ImportError, SystemError):
+    gevent.monkey.patch_all(subprocess=True)
+except ImportError:
     gevent = None
 
 import errno
@@ -2300,6 +2300,7 @@ class PAASProxyHandler(GAEProxyHandler):
 
     def first_run(self):
         if not common.PROXY_ENABLE:
+            common.resolve_iplist()
             fetchhost = re.sub(r':\d+$', '', urlparse.urlparse(common.PAAS_FETCHSERVER).netloc)
             logging.info('resolve common.PAAS_FETCHSERVER domain=%r to iplist', fetchhost)
             fethhost_iplist = http_util.dns_resolve(fetchhost)
@@ -2430,7 +2431,7 @@ class PACServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.wfile.write(data)
 
 
-class DNSServer(gevent.server.DatagramServer):
+class DNSServer(gevent.server.DatagramServer if gevent and hasattr(gevent.server, 'DatagramServer') else object):
     """DNS TCP Proxy based on gevent/dnslib"""
 
     blacklist = set(['1.1.1.1',
