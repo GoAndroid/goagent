@@ -1946,6 +1946,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 hostname = common.HOSTS_MAP[host]
             elif host.endswith(common.HOSTS_POSTFIX_ENDSWITH):
                 hostname = next(common.HOSTS_POSTFIX_MAP[x] for x in common.HOSTS_POSTFIX_MAP if host.endswith(x))
+                common.HOSTS_MAP[host] = hostname
             else:
                 hostname = host
             hostname = hostname or host
@@ -2148,10 +2149,12 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                         hostname = common.CONNECT_HOSTS_MAP[self.path]
                     elif self.path.endswith(common.CONNECT_POSTFIX_ENDSWITH):
                         hostname = next(common.CONNECT_POSTFIX_MAP[x] for x in common.CONNECT_POSTFIX_MAP if self.path.endswith(x))
+                        common.CONNECT_HOSTS_MAP[self.path] = hostname
                     elif host in common.HOSTS_MAP:
                         hostname = common.HOSTS_MAP[host]
                     elif host.endswith(common.HOSTS_POSTFIX_ENDSWITH):
                         hostname = next(common.HOSTS_POSTFIX_MAP[x] for x in common.HOSTS_POSTFIX_MAP if host.endswith(x))
+                        common.HOSTS_MAP[host] = hostname
                     else:
                         hostname = host
                     hostname = hostname or host
