@@ -1339,7 +1339,10 @@ class Common(object):
         ConfigParser.RawConfigParser.OPTCRE = re.compile(r'(?P<option>[^=\s][^=]*)\s*(?P<vi>[=])\s*(?P<value>.*)$')
         self.CONFIG = ConfigParser.ConfigParser()
         self.CONFIG_FILENAME = os.path.splitext(os.path.abspath(__file__))[0]+'.ini'
+        self.CONFIG_USER_FILENAME = re.sub(r'\.ini', '.user.ini', self.CONFIG_FILENAME)
         self.CONFIG.read(self.CONFIG_FILENAME)
+        if os.path.isfile(self.CONFIG_USER_FILENAME):
+            self.CONFIG.read(self.CONFIG_USER_FILENAME)
 
         self.LISTEN_IP = self.CONFIG.get('listen', 'ip')
         self.LISTEN_PORT = self.CONFIG.getint('listen', 'port')
