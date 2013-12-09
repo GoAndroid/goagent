@@ -915,7 +915,7 @@ class HTTPUtil(object):
         return iplist
 
     def create_connection(self, address, timeout=None, source_address=None, **kwargs):
-        connection_cache_key = kwargs.get('cache_key') or address
+        connection_cache_key = kwargs.get('cache_key')
         def _create_connection(ipaddr, timeout, queobj):
             sock = None
             try:
@@ -949,12 +949,12 @@ class HTTPUtil(object):
             for i in range(count):
                 sock = queobj.get()
                 if sock and not isinstance(sock, Exception):
-                    if i == 0:
+                    if connection_cache_key and i == 0:
                         self.tcp_connection_cache[connection_cache_key].put((time.time(), sock))
                     else:
                         sock.close()
         try:
-            while True:
+            while connection_cache_key:
                 ctime, sock = self.tcp_connection_cache[connection_cache_key].get_nowait()
                 if time.time() - ctime < 30:
                     return sock
@@ -985,7 +985,7 @@ class HTTPUtil(object):
                         logging.warning('create_connection to %s return %r, try again.', addrs, result)
 
     def create_ssl_connection(self, address, timeout=None, source_address=None, **kwargs):
-        connection_cache_key = kwargs.get('cache_key') or address
+        connection_cache_key = kwargs.get('cache_key')
         def _create_ssl_connection(ipaddr, timeout, queobj):
             sock = None
             ssl_sock = None
@@ -1097,12 +1097,12 @@ class HTTPUtil(object):
             for i in range(count):
                 sock = queobj.get()
                 if sock and not isinstance(sock, Exception):
-                    if i == 0:
+                    if connection_cache_key and i == 0:
                         self.ssl_connection_cache[connection_cache_key].put((time.time(), sock))
                     else:
                         sock.close()
         try:
-            while True:
+            while connection_cache_key:
                 ctime, sock = self.ssl_connection_cache[connection_cache_key].get_nowait()
                 if time.time() - ctime < 30:
                     return sock
@@ -1945,7 +1945,8 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 http_util.dns[host] = common.IPLIST_MAP[hostname]
             else:
                 http_util.dns[host] = sum((http_util.dns_resolve(x) for x in hostname.split('|')), [])
-            response = http_util.request(self.command, self.path, payload, self.headers, crlf=common.GAE_CRLF)
+            connection_cache_key = hostname if host not in common.HTTP_FAKEHTTPS else None
+            response = http_util.request(self.command, self.path, payload, self.headers, crlf=common.GAE_CRLF, connection_cache_key=connection_cache_key)
             if not response:
                 return
             logging.info('%s "FWD %s %s HTTP/1.1" %s %s', self.address_string(), self.command, self.path, response.status, response.getheader('Content-Length', '-'))
@@ -2150,7 +2151,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                         http_util.dns[host] = common.IPLIST_MAP[hostname]
                     else:
                         http_util.dns[host] = sum((http_util.dns_resolve(x) for x in hostname.split('|')), [])
-                    connection_cache_key = '%s:%d' % (hostname, port) if hostname else ''
+                    connection_cache_key = '%s:%d' % (hostname or host, port)
                     timeout = 4
                     remote = http_util.create_connection((host, port), timeout, cache_key=connection_cache_key)
                     if remote is not None and data:
