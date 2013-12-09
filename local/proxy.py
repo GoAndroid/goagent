@@ -1344,6 +1344,10 @@ class Common(object):
         if os.path.isfile(self.CONFIG_USER_FILENAME):
             self.CONFIG.read(self.CONFIG_USER_FILENAME)
 
+        if not self.CONFIG.has_section('http'):
+            logging.error('please upgrade your proxy.ini')
+            sys.exit(-1)
+
         self.LISTEN_IP = self.CONFIG.get('listen', 'ip')
         self.LISTEN_PORT = self.CONFIG.getint('listen', 'port')
         self.LISTEN_VISIBLE = self.CONFIG.getint('listen', 'visible')
