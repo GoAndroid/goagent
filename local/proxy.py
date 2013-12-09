@@ -49,7 +49,6 @@ try:
     import gevent.queue
     import gevent.event
     import gevent.monkey
-    sys.modules.pop('threading', None)
     gevent.monkey.patch_all(subprocess=True)
 except ImportError:
     gevent = None
@@ -1354,7 +1353,6 @@ class Common(object):
         self.GAE_PASSWORD = self.CONFIG.get('gae', 'password').strip()
         self.GAE_PATH = self.CONFIG.get('gae', 'path')
         self.GAE_MODE = self.CONFIG.get('gae', 'mode')
-        self.GAE_IPV6 = self.CONFIG.getint('gae', 'ipv6')
         self.GAE_WINDOW = self.CONFIG.getint('gae', 'window')
         self.GAE_CRLF = self.CONFIG.getint('gae', 'crlf')
         self.GAE_VALIDATE = self.CONFIG.getint('gae', 'validate')
@@ -1362,20 +1360,19 @@ class Common(object):
         self.GAE_OPTIONS = self.CONFIG.get('gae', 'options')
         self.GAE_FETCHSERVER = '%s://%s.appspot.com%s?' % (self.GAE_MODE, self.GAE_APPIDS[0], self.GAE_PATH)
 
-        hosts_secname, http_secname = ('hosts', 'http') if not self.GAE_IPV6 else ('ipv6/hosts', 'ipv6/http')
-        self.HOSTS_MAP = collections.OrderedDict((k, v or k) for k, v in self.CONFIG.items(hosts_secname) if '\\' not in k and ':' not in k and not k.startswith('.'))
-        self.HOSTS_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items(hosts_secname) if '\\' not in k and ':' not in k and k.startswith('.'))
+        self.HOSTS_MAP = collections.OrderedDict((k, v or k) for k, v in self.CONFIG.items('hosts') if '\\' not in k and ':' not in k and not k.startswith('.'))
+        self.HOSTS_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items('hosts') if '\\' not in k and ':' not in k and k.startswith('.'))
         self.HOSTS_POSTFIX_ENDSWITH = tuple(self.HOSTS_POSTFIX_MAP)
 
-        self.CONNECT_HOSTS_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items(hosts_secname) if ':' in k and not k.startswith('.'))
-        self.CONNECT_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items(hosts_secname) if ':' in k and k.startswith('.'))
+        self.CONNECT_HOSTS_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items('hosts') if ':' in k and not k.startswith('.'))
+        self.CONNECT_POSTFIX_MAP = collections.OrderedDict((k, v) for k, v in self.CONFIG.items('hosts') if ':' in k and k.startswith('.'))
         self.CONNECT_POSTFIX_ENDSWITH = tuple(self.CONNECT_POSTFIX_MAP)
 
-        self.METHOD_REMATCH_MAP = collections.OrderedDict((re.compile(k).match, v) for k, v in self.CONFIG.items(hosts_secname) if '\\' in k)
+        self.METHOD_REMATCH_MAP = collections.OrderedDict((re.compile(k).match, v) for k, v in self.CONFIG.items('hosts') if '\\' in k)
 
-        self.HTTP_FORCEHTTPS = set(self.CONFIG.get(http_secname, 'forcehttps').split('|'))
-        self.HTTP_FAKEHTTPS = set(self.CONFIG.get(http_secname, 'fakehttps').split('|'))
-        self.HTTP_WITHGAE = set(self.CONFIG.get(http_secname, 'withgae').split('|'))
+        self.HTTP_FORCEHTTPS = set(self.CONFIG.get('http', 'forcehttps').split('|'))
+        self.HTTP_FAKEHTTPS = set(self.CONFIG.get('http', 'fakehttps').split('|'))
+        self.HTTP_WITHGAE = set(self.CONFIG.get('http', 'withgae').split('|'))
 
         self.IPLIST_MAP = collections.OrderedDict((k, v.split('|')) for k, v in self.CONFIG.items('iplist'))
         self.IPLIST_MAP.update((k, [k]) for k, v in self.HOSTS_MAP.items() if k == v)
