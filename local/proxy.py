@@ -1921,7 +1921,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             return self.wfile.write(('HTTP/1.1 301\r\nLocation: %s\r\n\r\n' % self.path.replace('http://', 'https://', 1)).encode())
         if self.command not in ('GET', 'POST', 'HEAD', 'PUT', 'DELETE', 'PATCH'):
             return self.do_METHOD_FWD()
-        if any(x(self.path) for x in common.METHOD_REMATCH_MAP):
+        if any(x(self.path) for x in common.METHOD_REMATCH_MAP) or host in common.HOSTS_MAP or host.endswith(common.HOSTS_POSTFIX_ENDSWITH):
             return self.do_METHOD_FWD()
         else:
             return self.do_METHOD_GAE()
