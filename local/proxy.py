@@ -1342,7 +1342,11 @@ class Common(object):
         self.CONFIG_USER_FILENAME = re.sub(r'\.ini', '.user.ini', self.CONFIG_FILENAME)
         self.CONFIG.read(self.CONFIG_FILENAME)
         if os.path.isfile(self.CONFIG_USER_FILENAME):
-            self.CONFIG.read(self.CONFIG_USER_FILENAME)
+            with open(self.CONFIG_USER_FILENAME, 'rb') as fp:
+                content = fp.read()
+                if '[hosts]' in content:
+                    self.CONFIG.remove_section('hosts')
+                self.CONFIG.readfp(io.BytesIO(content))
 
         if not self.CONFIG.has_section('http'):
             logging.error('please upgrade your proxy.ini')
