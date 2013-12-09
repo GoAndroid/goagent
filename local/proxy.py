@@ -49,6 +49,7 @@ try:
     import gevent.queue
     import gevent.event
     import gevent.monkey
+    sys.modules.pop('threading', None)
     gevent.monkey.patch_all(subprocess=True)
 except ImportError:
     gevent = None
