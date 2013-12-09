@@ -2137,7 +2137,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             for i in range(5):
                 try:
                     if self.path in common.CONNECT_HOSTS_MAP:
-                        hostname = common.CONNECT_HOSTS_MAP[host]
+                        hostname = common.CONNECT_HOSTS_MAP[self.path]
                     elif self.path.endswith(common.CONNECT_POSTFIX_ENDSWITH):
                         hostname = next(common.CONNECT_POSTFIX_MAP[x] for x in common.CONNECT_POSTFIX_MAP if self.path.endswith(x))
                     elif host in common.HOSTS_MAP:
