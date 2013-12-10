@@ -1933,7 +1933,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if common.USERAGENT_ENABLE:
             self.headers['User-Agent'] = common.USERAGENT_STRING
         if host in common.HTTP_WITHGAE:
-            return self.do_METHOD_GAE()
+            return self.do_METHOD_AGENT()
         if host in common.HTTP_FORCEHTTPS:
             return self.wfile.write(('HTTP/1.1 301\r\nLocation: %s\r\n\r\n' % self.path.replace('http://', 'https://', 1)).encode())
         if self.command not in ('GET', 'POST', 'HEAD', 'PUT', 'DELETE', 'PATCH'):
@@ -1941,7 +1941,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if any(x(self.path) for x in common.METHOD_REMATCH_MAP) or host in common.HOSTS_MAP or host.endswith(common.HOSTS_POSTFIX_ENDSWITH):
             return self.do_METHOD_FWD()
         else:
-            return self.do_METHOD_GAE()
+            return self.do_METHOD_AGENT()
 
     def do_METHOD_FWD(self):
         """Direct http forward"""
@@ -1988,7 +1988,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             logging.warn('GAEProxyHandler direct(%s) Error', host)
             raise
 
-    def do_METHOD_GAE(self):
+    def do_METHOD_AGENT(self):
         """GAE http urlfetch"""
         request_headers = dict((k.title(), v) for k, v in self.headers.items())
         host = request_headers.get('Host', '')
@@ -2056,7 +2056,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                         common.GAE_APPIDS.pop(0)
                         common.GAE_FETCHSERVER = '%s://%s.appspot.com%s?' % (common.GAE_MODE, common.GAE_APPIDS[0], common.GAE_PATH)
                         logging.info('Current APPID Over Quota,Auto Switch to [%s], Retrying…' % (common.GAE_APPIDS[0]))
-                        self.do_METHOD_GAE()
+                        self.do_METHOD_AGENT()
                         return
                     else:
                         logging.error('All APPID Over Quota')
@@ -2115,7 +2115,7 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 if response:
                     response.close()
                 if e.args[0] in (errno.ECONNABORTED, errno.EPIPE):
-                    logging.debug('GAEProxyHandler.do_METHOD_GAE return %r', e)
+                    logging.debug('GAEProxyHandler.do_METHOD_AGENT return %r', e)
                 elif e.args[0] in (errno.ECONNRESET, errno.ETIMEDOUT, errno.ENETUNREACH, 11004):
                     # connection reset or timeout, switch to https
                     common.GAE_MODE = 'https'
@@ -2123,13 +2123,13 @@ class GAEProxyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 elif e.args[0] == errno.ETIMEDOUT or isinstance(e.args[0], str) and 'timed out' in e.args[0]:
                     if content_length and accept_ranges == 'bytes':
                         # we can retry range fetch here
-                        logging.warn('GAEProxyHandler.do_METHOD_GAE timed out, url=%r, content_length=%r, try again', self.path, content_length)
+                        logging.warn('GAEProxyHandler.do_METHOD_AGENT timed out, url=%r, content_length=%r, try again', self.path, content_length)
                         self.headers['Range'] = 'bytes=%d-%d' % (start, end)
                 elif isinstance(e, NetWorkIOError) and 'bad write retry' in e.args[-1]:
-                    logging.info('GAEProxyHandler.do_METHOD_GAE url=%r return %r, abort.', self.path, e)
+                    logging.info('GAEProxyHandler.do_METHOD_AGENT url=%r return %r, abort.', self.path, e)
                     return
                 else:
-                    logging.exception('GAEProxyHandler.do_METHOD_GAE %r return %r, try again', self.path, e)
+                    logging.exception('GAEProxyHandler.do_METHOD_AGENT %r return %r, try again', self.path, e)
 
     def do_CONNECT(self):
         """handle CONNECT cmmand, socket forward or deploy a fake cert"""
@@ -2338,10 +2338,11 @@ class PAASProxyHandler(GAEProxyHandler):
         self.__class__.do_HEAD = self.__class__.do_METHOD
         self.__class__.do_DELETE = self.__class__.do_METHOD
         self.__class__.do_OPTIONS = self.__class__.do_METHOD
-        self.__class__.do_CONNECT = GAEProxyHandler.do_CONNECT_AGENT
+        #self.__class__.do_CONNECT = GAEProxyHandler.do_CONNECT_AGENT
+        self.__class__.do_CONNECT = GAEProxyHandler.do_CONNECT
         self.setup()
 
-    def do_METHOD(self):
+    def do_METHOD_AGENT(self):
         try:
             headers = dict((k.title(), v) for k, v in self.headers.items())
             host = headers.get('Host', '')
