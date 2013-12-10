@@ -1399,6 +1399,7 @@ class Common(object):
         self.PAAS_CRLF = self.CONFIG.getint('paas', 'crlf') if self.CONFIG.has_option('paas', 'crlf') else 1
         self.PAAS_VALIDATE = self.CONFIG.getint('paas', 'validate') if self.CONFIG.has_option('paas', 'validate') else 0
         self.PAAS_FETCHSERVER = self.CONFIG.get('paas', 'fetchserver')
+        self.PAAS_USEHOSTS = self.CONFIG.getint('paas', 'usehosts')
 
         self.PROXY_ENABLE = self.CONFIG.getint('proxy', 'enable')
         self.PROXY_AUTODETECT = self.CONFIG.getint('proxy', 'autodetect') if self.CONFIG.has_option('proxy', 'autodetect') else 0
@@ -2332,14 +2333,22 @@ class PAASProxyHandler(GAEProxyHandler):
             except Exception as e:
                 logging.exception('PAASProxyHandler.first_run() return %r', e)
         self.__class__.setup = BaseHTTPServer.BaseHTTPRequestHandler.setup
-        self.__class__.do_GET = self.__class__.do_METHOD
-        self.__class__.do_PUT = self.__class__.do_METHOD
-        self.__class__.do_POST = self.__class__.do_METHOD
-        self.__class__.do_HEAD = self.__class__.do_METHOD
-        self.__class__.do_DELETE = self.__class__.do_METHOD
-        self.__class__.do_OPTIONS = self.__class__.do_METHOD
-        #self.__class__.do_CONNECT = GAEProxyHandler.do_CONNECT_AGENT
-        self.__class__.do_CONNECT = GAEProxyHandler.do_CONNECT
+        if common.PAAS_USEHOSTS:
+            self.__class__.do_GET = self.__class__.do_METHOD
+            self.__class__.do_PUT = self.__class__.do_METHOD
+            self.__class__.do_POST = self.__class__.do_METHOD
+            self.__class__.do_HEAD = self.__class__.do_METHOD
+            self.__class__.do_DELETE = self.__class__.do_METHOD
+            self.__class__.do_OPTIONS = self.__class__.do_METHOD
+            self.__class__.do_CONNECT = GAEProxyHandler.do_CONNECT
+        else:
+            self.__class__.do_GET = self.__class__.do_METHOD_AGENT
+            self.__class__.do_PUT = self.__class__.do_METHOD_AGENT
+            self.__class__.do_POST = self.__class__.do_METHOD_AGENT
+            self.__class__.do_HEAD = self.__class__.do_METHOD_AGENT
+            self.__class__.do_DELETE = self.__class__.do_METHOD_AGENT
+            self.__class__.do_OPTIONS = self.__class__.do_METHOD_AGENT
+            self.__class__.do_CONNECT = GAEProxyHandler.do_CONNECT_AGENT
         self.setup()
 
     def do_METHOD_AGENT(self):
